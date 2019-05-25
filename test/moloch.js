@@ -776,64 +776,13 @@ contract('Moloch fork', accounts => {
       })
     })
   })
-  /*
-  describe('updateDelegateKey', () => {
-    beforeEach(async () => {
-      // vote in a new member to test failing requires
-      await token.transfer(proposal1.applicant, proposal1.tokenTribute, { from: creator })
-      await token.approve(moloch.address, 10, { from: summoner })
-      await token.approve(moloch.address, proposal1.tokenTribute, { from: proposal1.applicant })
-
-      await moloch.submitProposal(proposal1.applicant, proposal1.tokenTribute, proposal1.sharesRequested, proposal1.details, { from: summoner })
-
-      await moveForwardPeriods(1)
-      await moloch.submitVote(0, 1, { from: summoner })
-
-      await moveForwardPeriods(config.VOTING_DURATON_IN_PERIODS)
-      await moveForwardPeriods(config.GRACE_DURATON_IN_PERIODS)
-      await moloch.processProposal(0, { from: processor })
-    })
-
-    it('happy case', async () => {
-      await moloch.updateDelegateKey(creator, { from: summoner })
-      await verifyUpdateDelegateKey(summoner, summoner, creator)
-    })
-
-    it('require fail - newDelegateKey cannot be 0', async () => {
-      await moloch.updateDelegateKey(zeroAddress, { from: summoner }).should.be.rejectedWith('newDelegateKey cannot be 0')
-    })
-
-    it('require fail - cant overwrite existing members', async () => {
-      await moloch.updateDelegateKey(proposal1.applicant, { from: summoner }).should.be.rejectedWith('cant overwrite existing members')
-    })
-
-    it('require fail - cant overwrite existing delegate keys', async () => {
-      // first set the p1 applicant delegate key to the creator
-      await moloch.updateDelegateKey(creator, { from: proposal1.applicant })
-      // then try to overwrite it
-      await moloch.updateDelegateKey(creator, { from: summoner }).should.be.rejectedWith('cant overwrite existing delegate keys')
-    })
-
-    it('modifier - member', async () => {
-      await moloch.updateDelegateKey(creator, { from: creator }).should.be.rejectedWith('not a member')
-    })
-
-    it('edge - can reset the delegatekey to your own member address', async () => {
-      // first set the delegate key to the creator
-      await moloch.updateDelegateKey(creator, { from: summoner })
-      await verifyUpdateDelegateKey(summoner, summoner, creator)
-      // then reset it to the summoner
-      await moloch.updateDelegateKey(summoner, { from: summoner })
-      await verifyUpdateDelegateKey(summoner, creator, summoner)
-    })
-  })
 
   describe('guildbank.withdraw', () => {
     it('modifier - owner', async () => {
-      await guildBank.withdraw(summoner, 1, 1).should.be.rejectedWith(SolRevert)
+      await curvedGuildBank.withdraw(summoner, 1, 1).should.be.rejectedWith(SolRevert)
     })
   })
-
+  /*
   describe('two proposals', () => {
     beforeEach(async () => {
       proposal2 = {
