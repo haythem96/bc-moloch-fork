@@ -666,8 +666,11 @@ contract('Moloch fork', accounts => {
       let molochTokenBalance = await curvedGuildBank.balanceOf(moloch.address)
       console.log("Moloch token balance before: ", molochTokenBalance.toNumber())
 
-      console.log("Shares to burn: ", 1);
+      let summonerTokenBalance = await curvedGuildBank.balanceOf(creator)
+      console.log("Summoner token balance before: ", summonerTokenBalance.toNumber())
+
       console.log("Total shares: ", parseInt(await moloch.totalShares()));
+      console.log("Shares to burn: ", 1);
 
       await moloch.ragequit(1, { from: creator })
 
@@ -682,8 +685,8 @@ contract('Moloch fork', accounts => {
       molochTokenBalance = await curvedGuildBank.balanceOf(moloch.address)
       console.log("Moloch token balance after: ", molochTokenBalance.toNumber())
 
-      const summonerTokenBalance = await curvedGuildBank.balanceOf(creator)
-      console.log("Summoner token balance: ", summonerTokenBalance.toNumber())
+      summonerTokenBalance = await curvedGuildBank.balanceOf(creator)
+      console.log("Summoner token balance after: ", summonerTokenBalance.toNumber())
     })
     
     it('require fail - insufficient shares', async () => {
@@ -706,41 +709,25 @@ contract('Moloch fork', accounts => {
       await moloch.ragequit(1, { from: creator })
       await moloch.ragequit(1, { from: creator }).should.be.rejectedWith('not a member')
     })
-    /*
-    it('edge case - weth sent to guild bank can be withdrawn via ragequit', async () => {
-      await moloch.processProposal(0)
-
-      await token.transfer(guildBank.address, 100, { from: creator })
-      const guildBankBalance1 = await token.balanceOf(guildBank.address)
-      assert.equal(guildBankBalance1, proposal1.tokenTribute + 100)
-
-      await moloch.ragequit(1, { from: summoner })
-
-      const summonerBalance = await token.balanceOf(summoner)
-      const expectedBalance = initSummonerBalance - config.PROCESSING_REWARD + (guildBankBalance1 / 2)
-      assert.equal(+summonerBalance.toString(), expectedBalance)
-
-      const guildBankBalance2 = await token.balanceOf(guildBank.address)
-      assert.equal(guildBankBalance2, guildBankBalance1 / 2)
-    })
-    */
+    
     // TODO how might guildbank withdrawal fail?
     // - it could uint256 overflow
   })
-  /*
+  
   describe('abort', () => {
     beforeEach(async () => {
-      await token.transfer(proposal1.applicant, proposal1.tokenTribute, { from: creator })
-      await token.approve(moloch.address, 10, { from: summoner })
-      await token.approve(moloch.address, proposal1.tokenTribute, { from: proposal1.applicant })
-
-      await moloch.submitProposal(proposal1.applicant, proposal1.tokenTribute, proposal1.sharesRequested, proposal1.details, { from: summoner })
+      await moloch.submitProposal(investorProposal.tokenTribute, investorProposal.sharesRequested, investorProposal.details, { from: investorProposal.applicant, value: msgValue })
     })
 
     it('happy case', async () => {
-      await moloch.abort(0, { from: proposal1.applicant })
+      const initialMolochBalance = await web3.eth.getBalance(moloch.address); 
+      
+      let proposal = await moloch.proposalQueue.call(0)
+      const initialProposalEth = proposal.value;
 
-      const proposal = await moloch.proposalQueue.call(0)
+      await moloch.abort(0, { from: investorProposal.applicant })
+
+      proposal = await moloch.proposalQueue.call(0)
       assert.equal(proposal.tokenTribute, 0)
       assert.equal(proposal.sharesRequested, 1)
       assert.equal(proposal.yesVotes, 0)
@@ -755,19 +742,13 @@ contract('Moloch fork', accounts => {
 
       const totalShares = await moloch.totalShares()
       assert.equal(totalShares, 1)
-
-      const molochBalance = await token.balanceOf(moloch.address)
-      assert.equal(molochBalance, config.PROPOSAL_DEPOSIT)
-
-      const summonerBalance = await token.balanceOf(summoner)
-      assert.equal(summonerBalance, initSummonerBalance - config.PROPOSAL_DEPOSIT)
-
-      const applicantBalance = await token.balanceOf(proposal1.applicant)
-      assert.equal(applicantBalance, proposal1.tokenTribute)
+      
+      const molochBalance = await web3.eth.getBalance(moloch.address);
+      assert.equal(molochBalance, initialMolochBalance-initialProposalEth)
     })
-
+    
     it('require fail - proposal does not exist', async () => {
-      await moloch.abort(1, { from: proposal1.applicant }).should.be.rejectedWith('proposal does not exist')
+      await moloch.abort(1, { from: investorProposal.applicant }).should.be.rejectedWith('proposal does not exist')
     })
 
     it('require fail - msg.sender must be applicant', async () => {
@@ -775,30 +756,27 @@ contract('Moloch fork', accounts => {
     })
 
     it('require fail - proposal must not have already been aborted', async () => {
-      await moloch.abort(0, { from: proposal1.applicant })
-      await moloch.abort(0, { from: proposal1.applicant }).should.be.rejectedWith('proposal must not have already been aborted')
+      await moloch.abort(0, { from: investorProposal.applicant })
+      await moloch.abort(0, { from: investorProposal.applicant }).should.be.rejectedWith('proposal must not have already been aborted')
     })
 
     describe('abort window boundary', () => {
       it('require fail - abort window must not have passed', async () => {
         await moveForwardPeriods(config.ABORT_WINDOW_IN_PERIODS + 1)
-        await moloch.abort(0, { from: proposal1.applicant }).should.be.rejectedWith('abort window must not have passed')
+        await moloch.abort(0, { from: investorProposal.applicant }).should.be.rejectedWith('abort window must not have passed')
       })
 
       it('success - abort 1 period before abort window expires', async () => {
         await moveForwardPeriods(config.ABORT_WINDOW_IN_PERIODS)
-        await moloch.abort(0, { from: proposal1.applicant })
+        await moloch.abort(0, { from: investorProposal.applicant })
 
         const proposal = await moloch.proposalQueue.call(0)
         assert.equal(proposal.tokenTribute, 0)
         assert.equal(proposal.aborted, true)
-
-        const applicantBalance = await token.balanceOf(proposal1.applicant)
-        assert.equal(applicantBalance, proposal1.tokenTribute)
       })
     })
   })
-
+  /*
   describe('updateDelegateKey', () => {
     beforeEach(async () => {
       // vote in a new member to test failing requires

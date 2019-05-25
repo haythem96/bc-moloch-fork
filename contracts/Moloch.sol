@@ -379,6 +379,7 @@ contract Moloch {
             proposal.applicant.transfer(ethToAbort);
         }
 
+        proposal.tokenTribute = 0;
         proposal.aborted = true;
 
         emit Abort(proposalIndex, msg.sender);
