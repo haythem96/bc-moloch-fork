@@ -1,4 +1,4 @@
-pragma solidity 0.5.2;
+pragma solidity ^0.4.24;
 
 import "./oz/Ownable.sol";
 import "./oz/SafeMath.sol";
@@ -8,8 +8,6 @@ contract CurvedGuildBank is BondingCurve, Ownable {
     using SafeMath for uint256;
 
     event Withdrawal(address indexed receiver, uint256 amount);
-
-    //address payable wallet;
 
     // Desired Curve: Linear Progression W/ % Buy/Sell Delta
     // Ex: Sell is always 90% of buy price.
@@ -21,7 +19,6 @@ contract CurvedGuildBank is BondingCurve, Ownable {
     event Payout(uint256 payout, uint256 indexed timestamp);
 
     constructor(
-        //address payable _wallet,
         string memory name,
         string memory symbol,
         uint256 _slopeNumerator,
@@ -32,7 +29,6 @@ contract CurvedGuildBank is BondingCurve, Ownable {
             _sellPercentage < 100 && _sellPercentage != 0,
             "Percentage must be between 0 & 100"
         );
-        //wallet = _wallet;
         slopeNumerator = _slopeNumerator;
         slopeDenominator = _slopeDenominator;
         sellPercentage = _sellPercentage;
@@ -66,7 +62,7 @@ contract CurvedGuildBank is BondingCurve, Ownable {
     }
 
     /// Overwrite
-    function buy(address payable processor, address payable proposer, uint256 tokens) public payable onlyOwner {
+    function buy(address processor, address proposer, uint256 tokens) public payable onlyOwner {
         uint256 spreadBefore = spread(totalSupply());
         super.buy(processor, proposer, tokens);
 
@@ -79,8 +75,8 @@ contract CurvedGuildBank is BondingCurve, Ownable {
         emit Payout(spreadPayout, now);
     }
 
-    function withdraw(address payable receiver, uint256 shares, uint256 totalShares) public onlyOwner returns (bool) {
-        uint256 amount = balanceOf(address(this)).mul(shares).div(totalShares);
+    function withdraw(address receiver, uint256 shares, uint256 totalShares) public onlyOwner returns (bool) {
+        uint256 amount = balanceOf(msg.sender).mul(shares).div(totalShares);
         emit Withdrawal(receiver, amount);
         return transfer(receiver, amount);
     }
