@@ -110,7 +110,7 @@ contract('Moloch fork', accounts => {
     const expectedStartingPeriod = options.expectedStartingPeriod ? options.expectedStartingPeriod : 1
 
     const ethValue = options.ethValue ? options.ethValue : 0
-    const tributeTokenPrice = options.tributeTokenPrice ? options.tributeTokenPrice : 0
+    //const tributeTokenPrice = options.tributeTokenPrice ? options.tributeTokenPrice : 0
 
     const proposalData = await moloch.proposalQueue.call(proposalIndex)
     assert.equal(proposalData.applicant, proposal.applicant)
@@ -125,12 +125,11 @@ contract('Moloch fork', accounts => {
     assert.equal(proposalData.processed, false)
     assert.equal(proposalData.didPass, false)
     assert.equal(proposalData.aborted, false)
-    assert.equal(proposalData.tokenTribute, proposal.tokenTribute)
     assert.equal(proposalData.details, proposal.details)
     assert.equal(proposalData.maxTotalSharesAtYesVote, 0)
 
     
-    if(ethValue > 0 && proposalData.tokenTribute > 0) {
+    if(ethValue > 0) {
       assert.equal(proposalData.depositedETH, true)      
     }
     else {
@@ -250,7 +249,7 @@ contract('Moloch fork', accounts => {
   }
 
   before('deploy contracts', async () => {
-    moloch = await Moloch.new(accounts[0], "Curved Moloch", "CM", 17280, 35, 35, 5, 3, 1, 1, 90)
+    moloch = await Moloch.new(accounts[0], "Curved Moloch", "CM", 17280, 35, 35, 5, 3, 1)
     const guildBankAddress = await moloch.guildBank()
     curvedGuildBank = await CurvedGuildBank.at(guildBankAddress)
   })
@@ -263,14 +262,12 @@ contract('Moloch fork', accounts => {
 
     investorProposal = {
       applicant: accounts[2],
-      tokenTribute: 5,
       sharesRequested: 1,
       details: "all investors hail moloch"
     }
 
     artistProposal = {
       applicant: accounts[3],
-      tokenTribute: 0,
       sharesRequested: 1,
       details: "all artists hail moloch"
     }
@@ -331,46 +328,36 @@ contract('Moloch fork', accounts => {
     })
 
     describe('Investor', () => {
-      let tributeTokenPrice;
-
-      beforeEach(async () => {
-        tributeTokenPrice = await curvedGuildBank.calculatePurchaseReturn(investorProposal.tokenTribute);
-      })
-
       it('Investor happy case', async () => { 
         const initialMolochBalance = await web3.eth.getBalance(moloch.address);   
-        await moloch.submitProposal(investorProposal.tokenTribute, investorProposal.sharesRequested, investorProposal.details, { from: investorProposal.applicant, value: msgValue })
+        await moloch.submitProposal(investorProposal.sharesRequested, investorProposal.details, { from: investorProposal.applicant, value: msgValue })
         await verifySubmitProposal(investorProposal, 0, {
           initialTotalShares: 1,
-          initialApplicantBalance: investorProposal.tokenTribute,
           initialMolochTokenBalance: 0,
           initialMolochBalance: initialMolochBalance,
           ethValue: msgValue,
-          tributeTokenPrice: tributeTokenPrice
         })
       })
       
       it('require fail - insufficient deposited ETH', async () => {    
-        await moloch.submitProposal(investorProposal.tokenTribute, investorProposal.sharesRequested, investorProposal.details, { from: investorProposal.applicant, value: 0 }).should.be.rejectedWith('Did not send enough ether to buy tributed tokens')
+        await moloch.submitProposal(investorProposal.sharesRequested, investorProposal.details, { from: investorProposal.applicant, value: 0 }).should.be.rejectedWith('Did not send enough ether to buy tributed tokens')
       })
 
       describe('uint overflow boundary', () => {
         it('require fail - uint overflow', async () => {
           investorProposal.sharesRequested = _1e18
-          await moloch.submitProposal(investorProposal.tokenTribute, investorProposal.sharesRequested, investorProposal.details, { from: investorProposal.applicant, value: msgValue }).should.be.rejectedWith('too many shares requested')
+          await moloch.submitProposal(investorProposal.sharesRequested, investorProposal.details, { from: investorProposal.applicant, value: msgValue }).should.be.rejectedWith('too many shares requested')
         })
   
         it('success - request 1 less share than the overflow limit', async () => {
           const initialMolochBalance = await web3.eth.getBalance(moloch.address);   
           investorProposal.sharesRequested = _1e18.sub(new BN(1)) // 1 less
-          await moloch.submitProposal(investorProposal.tokenTribute, investorProposal.sharesRequested, investorProposal.details, { from: investorProposal.applicant, value: msgValue })
+          await moloch.submitProposal(investorProposal.sharesRequested, investorProposal.details, { from: investorProposal.applicant, value: msgValue })
           await verifySubmitProposal(investorProposal, 0, {
             initialTotalShares: 1,
-            initialApplicantBalance: investorProposal.tokenTribute,
             initialMolochTokenBalance: 0,
             initialMolochBalance: initialMolochBalance,
             ethValue: msgValue,
-            tributeTokenPrice: tributeTokenPrice
           })
         })
       })
@@ -378,14 +365,12 @@ contract('Moloch fork', accounts => {
       it('edge case - shares requested is 0', async () => {
         const initialMolochBalance = await web3.eth.getBalance(moloch.address);   
         investorProposal.sharesRequested = 0
-        await moloch.submitProposal(investorProposal.tokenTribute, investorProposal.sharesRequested, investorProposal.details, { from: investorProposal.applicant, value: msgValue })
+        await moloch.submitProposal(investorProposal.sharesRequested, investorProposal.details, { from: investorProposal.applicant, value: msgValue })
         await verifySubmitProposal(investorProposal, 0,{
           initialTotalShares: 1,
-          initialApplicantBalance: investorProposal.tokenTribute,
           initialMolochTokenBalance: 0,
           initialMolochBalance: initialMolochBalance,
           ethValue: msgValue,
-          tributeTokenPrice: tributeTokenPrice
         })
       })
     });
@@ -393,10 +378,9 @@ contract('Moloch fork', accounts => {
     describe('Artist', () => {
       it('Artist happy case', async () => { 
         const initialMolochBalance = await web3.eth.getBalance(moloch.address);   
-        await moloch.submitProposal(artistProposal.tokenTribute, artistProposal.sharesRequested, artistProposal.details, { from: artistProposal.applicant })
+        await moloch.submitProposal(artistProposal.sharesRequested, artistProposal.details, { from: artistProposal.applicant })
         await verifySubmitProposal(artistProposal, 0, {
           initialTotalShares: 1,
-          initialApplicantBalance: artistProposal.tokenTribute,
           initialMolochTokenBalance: 0,
           initialMolochBalance: initialMolochBalance
         })
@@ -404,25 +388,18 @@ contract('Moloch fork', accounts => {
 
       it('success - deposit ETH', async () => {
         const initialMolochBalance = await web3.eth.getBalance(moloch.address);   
-        await moloch.submitProposal(artistProposal.tokenTribute, artistProposal.sharesRequested, artistProposal.details, { from: artistProposal.applicant, value: msgValue })
+        await moloch.submitProposal(artistProposal.sharesRequested, artistProposal.details, { from: artistProposal.applicant, value: msgValue })
         await verifySubmitProposal(artistProposal, 0, {
           initialTotalShares: 1,
-          initialApplicantBalance: artistProposal.tokenTribute,
           initialMolochTokenBalance: 0,
           initialMolochBalance: initialMolochBalance,
           ethValue: msgValue
         })
       })
-
-      it('require fail - deposit tribute token without ETH', async () => {  
-        artistProposal.tokenTribute = 5
-        await moloch.submitProposal(artistProposal.tokenTribute, artistProposal.sharesRequested, artistProposal.details, { from: artistProposal.applicant}).should.be.rejectedWith('Did not send enough ether to buy tributed tokens')
-        artistProposal.tokenTribute = 0
-      })
     })
     
   })
-
+  /*
   describe('submitVote', () => {
 
     beforeEach(async () => {

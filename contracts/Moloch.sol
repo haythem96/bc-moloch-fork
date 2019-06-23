@@ -31,9 +31,9 @@ contract Moloch {
     /***************
     EVENTS
     ***************/
-    event SubmitProposal(uint256 proposalIndex, address indexed delegateKey, address indexed memberAddress, address indexed applicant, uint256 tokenTribute, uint256 sharesRequested);
+    event SubmitProposal(uint256 proposalIndex, address indexed delegateKey, address indexed memberAddress, address indexed applicant, uint256 sharesRequested);
     event SubmitVote(uint256 indexed proposalIndex, address indexed delegateKey, address indexed memberAddress, uint8 uintVote);
-    event ProcessProposal(uint256 indexed proposalIndex, address indexed applicant, address indexed memberAddress, uint256 tokenTribute, uint256 sharesRequested, bool didPass);
+    event ProcessProposal(uint256 indexed proposalIndex, address indexed applicant, address indexed memberAddress, uint256 sharesRequested, bool didPass);
     event Ragequit(address indexed memberAddress, uint256 sharesToBurn);
     event Abort(uint256 indexed proposalIndex, address applicantAddress);
     event UpdateDelegateKey(address indexed memberAddress, address newDelegateKey);
@@ -62,7 +62,6 @@ contract Moloch {
     struct Proposal {
         address applicant; // the applicant who wishes to become a member - this key will be used for withdrawals
         uint256 value; //ETH value in case deposited
-        uint256 tokenTribute; //amount of tokens to mint with the deposited ETH
         uint256 sharesRequested; // the # of shares the applicant is requesting
         uint256 startingPeriod; // the period in which voting can start for this proposal
         uint256 yesVotes; // the total number of YES votes for this proposal
@@ -105,9 +104,7 @@ contract Moloch {
         uint256 _gracePeriodLength,
         uint256 _abortWindow,
         uint256 _dilutionBound,
-        uint256 _slopeNumerator,
-        uint256 _slopeDenominator,
-        uint256 _sellPercentage
+        uint32 _reserveRatio
     ) public {
         require(summoner != address(0), "Moloch::constructor - summoner cannot be 0");
         require(_periodDuration > 0, "Moloch::constructor - _periodDuration cannot be 0");
@@ -122,9 +119,7 @@ contract Moloch {
         guildBank = new CurvedGuildBank(
             bcTokenName,
             bcTokenSymbol,
-            _slopeNumerator,
-            _slopeDenominator,
-            _sellPercentage
+            _reserveRatio
         );
 
         periodDuration = _periodDuration;
@@ -147,7 +142,6 @@ contract Moloch {
     *****************/
 
     function submitProposal(
-        uint256 tokenTribute,
         uint256 sharesRequested,
         string memory details
     )
@@ -155,12 +149,6 @@ contract Moloch {
         payable
     {
         require(msg.sender != address(0), "Curved::submitProposal - applicant cannot be 0");
-
-        //make sure eth value sufficient to buy the tributed tokens
-        uint256 tributeTokenPrice = guildBank.calculatePurchaseReturn(tokenTribute);
-        if(tokenTribute > 0) {
-            require(tributeTokenPrice <= msg.value, "Did not send enough ether to buy tributed tokens");
-        }
 
         // Make sure we won't run into overflows when doing calculations with shares.
         // Note that totalShares + totalSharesRequested + sharesRequested is an upper bound
@@ -178,8 +166,7 @@ contract Moloch {
         // create proposal ...
         Proposal memory proposal = Proposal({
             applicant: msg.sender,
-            value: 0,
-            tokenTribute: 0,
+            value: msg.value,
             sharesRequested: sharesRequested,
             startingPeriod: startingPeriod,
             yesVotes: 0,
@@ -192,20 +179,9 @@ contract Moloch {
             maxTotalSharesAtYesVote: 0
         });
 
-        //send back ETH if deposited without specified tribute token amount
-        if((msg.value > 0) && (tokenTribute == 0)) {
-            proposal.applicant.transfer(msg.value);
-        }
-
         // if sender deposit ETH collect proposal deposit (ETH) and store it in the Moloch until the proposal is processed
-        if((msg.value > 0) && (tokenTribute > 0)) {
+        if(msg.value > 0) {
             proposal.depositedETH = true;
-            proposal.value = tributeTokenPrice;
-            if(msg.value > tributeTokenPrice) {
-                proposal.applicant.transfer(msg.value-tributeTokenPrice);
-            }
-            proposal.tokenTribute = tokenTribute;
-
         }
 
         // ... and append it to the queue
@@ -307,14 +283,9 @@ contract Moloch {
             totalShares = totalShares.add(proposal.sharesRequested);
 
             //if there is a deposited ETH
-            //mint amount of tokens(submited tokenTribute) into the curved guild bank
-            //send to msg.sender spreadPayout as processing reward
+            //mint amount of tokens into the curved guild bank
             if(proposal.depositedETH == true) {
-                /*require(
-                    guildBank.buy.value(proposal.value)(msg.sender, proposal.applicant, proposal.tokenTribute),
-                    "Moloch::processProposal - ETH transfer to curved guild bank or trojan token mint failed"
-                );*/
-                guildBank.buy.value(proposal.value)(msg.sender, proposal.applicant, proposal.tokenTribute);
+                guildBank.buy.value(proposal.value);
             }
 
         // PROPOSAL FAILED OR ABORTED
@@ -373,13 +344,12 @@ contract Moloch {
         require(getCurrentPeriod() < proposal.startingPeriod.add(abortWindow), "Moloch::abort - abort window must not have passed");
         require(!proposal.aborted, "Moloch::abort - proposal must not have already been aborted");
 
-        if((proposal.depositedETH == true) && (proposal.value > 0)) {
+        if(proposal.depositedETH == true) {
             uint256 ethToAbort = proposal.value;
             proposal.value = 0;
             proposal.applicant.transfer(ethToAbort);
         }
 
-        proposal.tokenTribute = 0;
         proposal.aborted = true;
 
         emit Abort(proposalIndex, msg.sender);
