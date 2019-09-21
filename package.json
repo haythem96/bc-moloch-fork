@@ -30,18 +30,18 @@
   },
   "scripts": {
     "compile": "node_modules/.bin/truffle compile",
-    "test": "node_modules/.bin/truffle test test/spank.js",
+    "test": "target=development node_modules/.bin/truffle test test/moloch.js",
     "gcli": "ganache-cli -m \"fetch local valve black attend double eye excite planet primary install allow\""
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ConnextProject/moloch.git"
+    "url": "git+https://github.com/haythem96/bc-moloch-fork"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/ConnextProject/moloch/issues"
+    "url": "https://github.com/haythem96/bc-moloch-fork/issues"
   },
-  "homepage": "https://github.com/ConnextProject/moloch#readme"
+  "homepage": "https://github.com/haythem96/bc-moloch-fork#readme"
 }
